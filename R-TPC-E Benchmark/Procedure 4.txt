@@ -1,0 +1,57 @@
+Workload # 3
+Procedure # 4
+#############################
+Return HOLDING_HISTORY information for a particular trade ID.
+
+Parameters:
+customer account, <T_CA_ID> = 43000002061
+Trade Id (<HH_T_ID> ): 200000014543998 
+the time is 2005-03-11 (<T_DTS> )
+
+
+
+###################################################
+
+
+CREATE OR REPLACE PROCEDURE w3_p4()
+
+AS BEGIN
+
+SELECT 
+		T_ID 
+FROM 
+		TRADE 
+WHERE 
+		T_CA_ID = <T_CA_ID> AND 
+		T_DTS >= <T_DTS> 
+ORDER BY 
+		T_DTS ASC;
+
+results = 
+		SELECT 
+				HH_H_T_ID, 
+				HH_T_ID, 
+				HH_BEFORE_QTY, 
+				HH_AFTER_QTY 
+		FROM 
+				HOLDING_HISTORY 
+		WHERE 
+				HH_H_T_ID IN (
+								SELECT 
+										HH_H_T_ID 
+								FROM 
+										HOLDING_HISTORY 
+								WHERE 
+										HH_T_ID = <HH_T_ID>);
+result = 
+		SELECT 
+				count(*) cnt 
+		FROM 
+				results ;
+
+SELECT 
+		* 
+FROM 
+		result;
+
+END;

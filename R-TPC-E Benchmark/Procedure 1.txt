@@ -1,0 +1,104 @@
+Workload # 3
+Procedure # 1
+#############################
+Get trade information for each trade ID for a given maximum range
+
+Parameters: 
+Initial Trade Id (m): 2000000000000001 
+Maximum Trade Id (n): 200000000000110
+
+###################################################
+
+CREATE OR REPLACE PROCEDURE w3_p1(
+		IN m BIGINT, 
+		IN n BIGINT)
+
+AS BEGIN
+
+DECLARE i BIGINT := m;
+
+DECLARE k BIGINT := n;
+
+   
+	SELECT 
+			T_BID_PRICE, 
+			T_EXEC_NAME, 
+			T_IS_CASH, 
+			TT_IS_MRKT, 
+			T_TRADE_PRICE  
+	FROM 
+			TRADE, 
+			TRADE_TYPE 
+	WHERE 
+			T_ID = i AND 
+			T_TT_ID = TT_ID;
+	
+	SELECT 
+			SE_AMT, 
+			SE_CASH_DUE_DATE, 
+			SE_CASH_TYPE 
+	FROM 
+			SETTLEMENT 
+	WHERE 
+			SE_T_ID = i;
+	
+	IF i > 0 THEN
+   	
+		SELECT 
+				CT_AMT, 
+				CT_DTS, 
+				CT_NAME 
+		FROM 
+				CASH_TRANSACTION 
+		WHERE 
+				CT_T_ID = i;
+	
+	END IF;
+
+	results = 
+				SELECT TOP 3 
+						TH_DTS, 
+						TH_ST_ID 
+				FROM 
+						TRADE_HISTORY 
+				WHERE 
+						TH_T_ID = i 
+				ORDER BY 
+						TH_DTS;
+
+WHILE i < k DO
+	
+	results = 
+				SELECT
+						*
+				FROM 
+						results
+				
+				UNION ALL
+				
+				(SELECT TOP 3 
+						TH_DTS, 
+						TH_ST_ID 
+				FROM 
+						TRADE_HISTORY 
+				WHERE 
+						TH_T_ID = i 
+				ORDER BY 
+						TH_DTS);
+   
+   i = i + 1;
+
+END WHILE;
+
+result = 
+		SELECT 
+				count(*) cnt 
+		FROM 
+				results;
+
+SELECT 
+		* 
+FROM 
+		result;
+
+END;

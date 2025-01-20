@@ -1,0 +1,68 @@
+Workload # 3
+Procedure # 5
+#############################
+Retrieve information on all trades for a range of customer account
+
+Parameters:
+customer account, <T_CA_ID> = 43000009998
+
+n = 43000002061
+
+###################################################
+
+CREATE OR REPLACE PROCEDURE w3_p5(IN n INTEGER)
+
+AS BEGIN
+	
+	SELECT 
+			T_ID, 
+			T_DTS, 
+			ST_NAME, 
+			TT_NAME, 
+			T_S_SYMB, 
+			T_QTY, 
+			T_EXEC_NAME, 
+			T_CHRG, 
+			S_NAME, 
+			EX_NAME 
+	FROM 
+			TRADE, 
+			STATUS_TYPE, 
+			TRADE_TYPE, 
+			SECURITY, 
+			EXCHANGE 
+	WHERE 
+			T_CA_ID = n AND 
+			ST_ID = T_ST_ID AND 
+			TT_ID = T_TT_ID AND 
+			S_SYMB = T_S_SYMB AND 
+			EX_ID = S_EX_ID 
+	ORDER BY  
+			T_DTS DESC;
+	
+	results = 
+			SELECT 
+					C_L_NAME, 
+					C_F_NAME, 
+					B_NAME 
+			FROM 
+					CUSTOMER_ACCOUNT, 
+					CUSTOMER, 
+					BROKER 
+			WHERE 
+					CA_ID = <T_CA_ID> AND 
+					C_ID = CA_C_ID AND 
+					B_ID = CA_B_ID;
+	
+	result = 
+			SELECT 
+					count(*) cnt 
+			FROM 
+					results;
+	
+	SELECT 
+			* 
+	FROM 
+			result;
+
+END;

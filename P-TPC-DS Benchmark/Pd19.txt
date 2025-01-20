@@ -1,0 +1,117 @@
+Pd 13
+##################
+We transformed this procedure from TPC-DS benchmark query# 19. We include a loop region to create this procedure.
+######################################
+ i = 1982, k = 2001
+ define YEAR= rANDom(1998, 2002, uniform);
+ define MONTH=rANDom(11,12,uniform);
+ define MGR_IDX = dist(i_manager_id, 1, 1);
+ define MANAGER=rANDom(distmember(i_manager_id, [MGR_IDX], 2), distmember(i_manager_id, [MGR_IDX], 3),uniform);
+ define _LIMIT=100;
+ 
+  MANAGER.01 = 8
+• MONTH.01 = 11
+• YEAR.01 = 1998
+################################################
+ 
+ 
+CREATE PROCEDURE PD_13(
+						IN INT i, 
+						IN INT k)
+AS BEGIN
+	
+	DECLARE n INT := i;
+	
+	v_t = 
+			[_LIMITA]  SELECT 
+							[_LIMITB] i_brAND_id brAND_id, 
+							i_brAND brAND, 
+							i_manufact_id, 
+							i_manufact,
+							sum(ss_ext_sales_price) ext_price
+			FROM 
+					date_dim, 
+					store_sales, 
+					item,customer,
+					customer_address,
+					store
+			WHERE 
+					d_date_sk = ss_sold_date_sk AND 
+					ss_item_sk = i_item_sk AND 
+					i_manager_id=[MANAGER] AND 
+					d_moy=[MONTH] AND 
+					d_year = i AND 
+					ss_customer_sk = c_customer_sk AND 
+					c_current_addr_sk = ca_address_sk AND 
+					substr(ca_zip,1,5) <> substr(s_zip,1,5) AND 
+					ss_store_sk = s_store_sk 
+			GROUP BY 
+					i_brAND
+					,i_brAND_id
+					,i_manufact_id
+					,i_manufact
+			ORDER BY 
+					ext_price DESC
+					,i_brAND
+					,i_brAND_id
+					,i_manufact_id
+					,i_manufact
+					[_LIMITC] ;
+	
+	WHILE i < k DO
+		
+		v_t = 
+			
+				SELECT 
+						* 
+				FROM
+						v_t
+						
+				UNION ALL
+			
+				([_LIMITA]  SELECT 
+								[_LIMITB] i_brAND_id brAND_id, 
+								i_brAND brAND, 
+								i_manufact_id, 
+								i_manufact,
+								sum(ss_ext_sales_price) ext_price
+				FROM 
+						date_dim, 
+						store_sales, 
+						item,customer,
+						customer_address,
+						store
+				WHERE 
+						d_date_sk = ss_sold_date_sk AND 
+						ss_item_sk = i_item_sk AND 
+						i_manager_id=[MANAGER] AND 
+						d_moy=[MONTH] AND 
+						d_year= between n AND i AND 
+						ss_customer_sk = c_customer_sk AND 
+						c_current_addr_sk = ca_address_sk AND 
+						substr(ca_zip,1,5) <> substr(s_zip,1,5) AND 
+						ss_store_sk = s_store_sk 
+				GROUP BY 
+						i_brAND
+						,i_brAND_id
+						,i_manufact_id
+						,i_manufact
+				ORDER BY 
+						ext_price DESC
+						,i_brAND
+						,i_brAND_id
+						,i_manufact_id
+						,i_manufact
+						[_LIMITC]) ;
+
+	
+	i = i + 1;
+	
+	END WHILE;
+	
+	SELECT 
+			count(*) 
+	FROM 
+			v_t;
+
+END;

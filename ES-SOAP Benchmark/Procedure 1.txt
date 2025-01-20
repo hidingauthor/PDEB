@@ -1,0 +1,107 @@
+#Procedure 1 
+######################################
+The procedure contains a loop region
+########################################
+## k=5
+##########################
+
+CREATE PROCEDURE PROC_1(IN INT k)
+AS BEGIN
+	DECLARE i INT := 1;
+	saleItem = SELECT 
+					ss_item_sk sk1, 
+					i_item_desc, 
+					i_item_sk, 
+					ss_customer_sk, 
+					ss_quantity					
+				FROM 
+					store_sales, 
+					item  					
+				WHERE 
+					ss_item_sk = i_item_sk AND 
+					i_color = 'red';
+	
+	saleDate = 
+				SELECT 
+					ss_item_sk sk2, 
+					d_year, 
+					d_date 
+				FROM 
+					store_sales, 
+					date_dim  
+				WHERE 
+					ss_sold_date_sk = d_date_sk;
+	
+	saleItemDate = 
+				SELECT 
+					d_year, 
+					i_item_desc, 
+					i_item_sk, 
+					d_date, 
+					ss_customer_sk, 
+					ss_quantity 
+				FROM 
+					saleDate, 
+					saleItem 
+				WHERE 
+					sk1 = sk2;
+	
+	aggItems = 
+				SELECT 
+					d_year, 
+					i_item_desc, 
+					i_item_sk, 
+					ss_customer_sk, 
+					ss_quantity, 
+					d_date, 
+					COUNT(*) cnt 
+				FROM 
+					saleItemDate 
+				where 
+					i_item_sk = NULL
+				GROUP BY 
+					ss_customer_sk, 
+					ss_quantity, 
+					i_item_desc, 
+					i_item_sk, 
+					d_date, 
+					d_year;
+	
+	WHILE i < k DO
+		aggItems = 
+					SELECT * 
+					FROM 
+						aggItems
+					UNION ALL
+					(SELECT 
+						d_year, 
+						i_item_desc, 
+						i_item_sk, 
+						ss_customer_sk, 
+						ss_quantity, 
+						d_date, 
+						COUNT(*) cnt 
+					FROM 
+						saleItemDate 
+					where 
+						i_item_sk between 1 and :i 
+					GROUP BY 
+						ss_customer_sk, 
+						ss_quantity, 
+						i_item_desc, 
+						i_item_sk, 
+						d_date, 
+						d_year);
+		i = i + 1;
+	END WHILE;
+	result = 
+			SELECT 
+				count(*) cnt 
+			FROM 
+				aggItems, 
+				customer 
+			WHERE 
+				ss_customer_sk = c_customer_sk AND 
+				ss_quantity < 100;
+	SELECT * FROM result;
+END;
