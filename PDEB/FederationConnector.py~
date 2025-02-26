@@ -1,0 +1,165 @@
+import pyhdb
+import sys
+
+
+class FederationConnector:
+
+    cursors = dict()
+    cons = dict()
+    federations = dict()
+    dropables = dict()
+
+    def __init__(self):
+        self.federations[1] = "DKE1_HANA.SystemDB.DKE1."
+        self.federations[2] = "DKE2_HANA.SystemDB.DKE2."
+        self.federations[3] = "DKE3_HANA.SystemDB.DKE3."
+        self.federations[4] = "DKE4_HANA.SystemDB.DKE4."
+
+    #39013
+    def create_federation_connection(self):
+        self.cons[1] = pyhdb.connect(
+            host="163.180.116.184",
+            port=39013,
+            user="dke1",
+            password="dkeHana1111"
+        )
+        # self.cons[2] = pyhdb.connect(
+        #     host="163.180.116.186",
+        #     port=39013,
+        #     user="dke2",
+        #     password="dkeHana222"
+        # )
+        self.cons[3] = pyhdb.connect(
+            host="163.180.116.189",
+            port=39013,
+            user="dke3",
+            password="dkeHana3333"
+        )
+        self.cons[4] = pyhdb.connect(
+            host="163.180.116.190",
+            port=39013,
+            user="dke4",
+            password="dkeHana4444"
+        )
+        self.cons[1].setautocommit(True)
+        # self.cons[2].setautocommit(True)
+        self.cons[3].setautocommit(True)
+        self.cons[4].setautocommit(True)
+        # print("conn: " + str(self.cons[1].isconnected()) + " " + str(self.cons[2].isconnected()) + " " + str(self.cons[3].isconnected()))
+        self.cursors[1] = self.cons[1].cursor()
+        # self.cursors[2] = self.cons[2].cursor()
+        self.cursors[3] = self.cons[3].cursor()
+        self.cursors[4] = self.cons[4].cursor()
+
+    def import_dataset(self, size):
+        self.execute_query(1, "SELECT COUNT(*) FROM customer", True)
+        self.execute_query(2, "SELECT COUNT(*) FROM date_dim", True)
+        self.execute_query(2, "SELECT COUNT(*) FROM store_sales", True)
+        self.execute_query(3, "SELECT COUNT(*) FROM item", True)
+        print("START truncating tables.\n")
+        self.execute_query(1, "truncate table customer", False)
+        self.execute_query(2, "truncate table date_dim", False)
+        self.execute_query(2, "truncate table store_sales", False)
+        self.execute_query(3, "truncate table item", False)
+        print("Truncate tables END.\n")
+        self.execute_query(1, "SELECT COUNT(*) FROM customer", True)
+        self.execute_query(2, "SELECT COUNT(*) FROM date_dim", True)
+        self.execute_query(2, "SELECT COUNT(*) FROM store_sales", True)
+        self.execute_query(3, "SELECT COUNT(*) FROM item", True)
+        idir = "/usr/sap/HXE/HDB90/work/dbg" + str(size)
+        delim = " WITH RECORD DELIMITED BY '\\n' FIELD DELIMITED BY '|' THREADS 10 BATCH 1000 "
+        error_log = "ERROR LOG '/usr/sap/HXE/HDB90/work/error.txt' FAIL ON INVALID DATA"
+        print("START importing tables from $1gb dataset.\n")
+        try:
+            self.execute_query(1, "IMPORT FROM CSV FILE '" + idir + "/customer.dat' INTO DKE1.customer" + delim + error_log, False)
+        except:
+            pass
+        try:
+            self.execute_query(2, "IMPORT FROM CSV FILE '" + idir + "/date_dim.dat' INTO DKE2.date_dim" + delim + error_log, False)
+        except:
+            pass
+        try:
+            self.execute_query(2, "IMPORT FROM CSV FILE '" + idir + "/store_sales.dat' INTO DKE2.store_sales" + delim + error_log, False)
+        except:
+            pass
+        try:
+            self.execute_query(3, "IMPORT FROM CSV FILE '" + idir + "/item.dat' INTO DKE3.item" + delim + error_log, False)
+        except:
+            pass
+        print("END of importing tables.\n")
+        self.execute_query(1, "SELECT COUNT(*) FROM customer", True)
+        self.execute_query(2, "SELECT COUNT(*) FROM date_dim", True)
+        self.execute_query(2, "SELECT COUNT(*) FROM store_sales", True)
+        self.execute_query(3, "SELECT COUNT(*) FROM item", True)
+
+    def disconnect_federation(self):
+        for con_id in self.cons:
+            try:
+                self.cons.get(con_id).close()
+            except pyhdb.exceptions.Error:
+                print("Unexpected error:", sys.exc_info()[0], " @FD"+str(con_id))
+        print("All connections are closed")
+
+    def add_to_dropables(self, federation_id, ddl):
+        if federation_id not in self.dropables:
+            self.dropables[federation_id] = list()
+        if ddl not in self.dropables.get(federation_id):
+            self.dropables.get(federation_id).append(ddl)
+
+    def execute_query(self, site_id, query, show_result=False):
+        try:
+            res = self.cursors.get(site_id).execute(query)
+            if show_result:
+                try:
+                    rows = res.fetchall()
+                    if rows:
+                        print("Result: {0}".format(str(rows)))
+                except pyhdb.exceptions.Error:
+                    # print("Fetching error:", sys.exc_info()[0], " @EB"+str(site_id)+": "+query+"\n")
+                    pass
+        except pyhdb.exceptions.Error:
+            print("Unexpected error:", sys.exc_info()[0], " @EB"+str(site_id)+": "+query)
+
+    def drop_dropables(self):
+        for site_id in self.dropables:
+            for tab_name in self.dropables.get(site_id):
+                try:
+                    self.cursors.get(site_id).execute("DROP VIEW "+tab_name+";")
+                except pyhdb.exceptions.Error:
+                    try:
+                        self.cursors.get(site_id).execute("DROP TYPE " + tab_name + ";")
+                    except pyhdb.exceptions.Error:
+                        try:
+                            self.cursors.get(site_id).execute("DROP TABLE "+tab_name+";")
+                        except pyhdb.exceptions.Error:
+                            try:
+                                self.cursors.get(site_id).execute("DROP PROCEDURE " + tab_name + ";")
+                            except pyhdb.exceptions.Error:
+                                print("Failed to drop " + tab_name + " @EB" + str(site_id))
+        self.dropables.clear()
+        # print("\nAll drops")
+
+
+    def getValue(self, site_id, query, show_result=False):
+        dataType = 0
+
+        try:
+            res = self.cursors.get(site_id).execute(query)
+            if show_result:
+                try:
+                    rows = res.fetchall()
+                    if rows:
+                        # pass
+                        # print("Result: {0}".format(str(rows)))
+                        for row in rows:
+                            # dataType = {row[0]:row[1]}
+                            dataType = row[0]
+                            # dataType.append(row_dict)
+                except pyhdb.exceptions.Error:
+                    print("Fetching error:", sys.exc_info()[0], " @EB"+str(site_id)+": "+query+"\n")
+                    # pass
+        except pyhdb.exceptions.Error:
+            pass
+            # print("Unexpected error:", sys.exc_info()[0], " @EB"+str(site_id)+": "+query)
+
+        return dataType
